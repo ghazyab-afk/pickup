@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { sendWhatsAppOTP, verifyOTP } from '../../services/phoneAuthService';
+import LanguageSelector from '../../components/LanguageSelector';
 
 const OTP_LENGTH = 6;
 const COUNTRY_CODE = '+968';
@@ -48,25 +49,32 @@ export default function PhoneAuthScreen({ navigation }: any) {
       return;
     }
 
-    const newOtp = [...otp];
-    newOtp[index] = value.slice(-1); // Keep only the last typed char
-    setOtp(newOtp);
+    const char = value.slice(-1);
+    
+    setOtp((prevOtp) => {
+      const newOtp = [...prevOtp];
+      newOtp[index] = char;
+      return newOtp;
+    });
 
     // Auto-advance
-    if (value && index < OTP_LENGTH - 1) {
+    if (char && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
   const handleOtpKeyPress = (key: string, index: number) => {
     if (key === 'Backspace') {
-      if (otp[index] === '' && index > 0) {
-        // If current is empty, move focus to previous and clear it
-        const newOtp = [...otp];
-        newOtp[index - 1] = '';
-        setOtp(newOtp);
-        inputRefs.current[index - 1]?.focus();
-      }
+      setOtp((prevOtp) => {
+        if (prevOtp[index] === '' && index > 0) {
+          // If current is empty, clear the previous one and move focus
+          const newOtp = [...prevOtp];
+          newOtp[index - 1] = '';
+          setTimeout(() => inputRefs.current[index - 1]?.focus(), 10);
+          return newOtp;
+        }
+        return prevOtp;
+      });
     }
   };
 
@@ -96,8 +104,11 @@ export default function PhoneAuthScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-slate-50"
+      className="flex-1 bg-slate-50 relative"
     >
+      <View className="absolute top-10 md:top-14 right-6 z-50">
+        <LanguageSelector />
+      </View>
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
         className="px-6 md:px-0"
@@ -114,10 +125,16 @@ export default function PhoneAuthScreen({ navigation }: any) {
               {step === 'phone' ? t('phone_auth.title') : t('phone_auth.otp_title')}
             </Text>
             <Text className="text-base md:text-lg lg:text-xl text-slate-400 font-medium mt-2 text-center">
-              {step === 'phone'
-                ? t('phone_auth.subtitle')
-                // Force LTR embedding (\u202A) for the phone number to prevent reverse rendering in Arabic
-                : `${t('phone_auth.otp_subtitle')} \u202A${COUNTRY_CODE} ${phone}\u202C`}
+              {step === 'phone' ? (
+                t('phone_auth.subtitle')
+              ) : (
+                <Text>
+                  {t('phone_auth.otp_subtitle')}{' '}
+                  <Text style={{ direction: 'ltr' }}>
+                    {COUNTRY_CODE} {phone}
+                  </Text>
+                </Text>
+              )}
             </Text>
           </View>
 
@@ -190,7 +207,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                       digit ? 'border-blue-500 bg-blue-50' : 'border-slate-200'
                     }`}
                     style={{ textAlign: 'center' }}
-                    maxLength={OTP_LENGTH} // Allow pasting full code
+                    maxLength={OTP_LENGTH}
                     keyboardType="number-pad"
                     value={digit}
                     onChangeText={(v) => handleOtpChange(v, i)}
