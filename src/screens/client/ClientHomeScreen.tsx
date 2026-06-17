@@ -504,7 +504,20 @@ export default function ClientHomeScreen() {
 
   // ── Render : Section adresses ─────────────────────────────────────────────
   const renderAddressCard = () => (
-    <View className="absolute top-12 md:top-16 left-4 md:left-8 right-4 md:right-8 lg:left-48 lg:right-48 bg-white rounded-2xl shadow-xl shadow-slate-900/10 p-3 md:p-5 z-50">
+    <View style={{
+      position: 'absolute',
+      top: 16,
+      left: 16,
+      right: 16,
+      zIndex: 10000,
+      backgroundColor: 'white',
+      borderRadius: 16,
+      padding: 14,
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 20,
+    }}>
 
       {/* ── DÉPART ── */}
       <View className="flex-row items-start border-b border-slate-100 pb-2 mb-2 md:pb-4 md:mb-4" style={{ zIndex: 60 }}>
@@ -778,7 +791,7 @@ export default function ClientHomeScreen() {
           // Carte Leaflet interactive (marqueurs départ+arrivée + clic)
           React.createElement('div', {
             ref: mapDivRef,
-            style: { flex: 1, width: '100%', height: '100%', minHeight: 300 },
+            style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
           })
         ) : location ? (
           <MapView
