@@ -115,6 +115,13 @@ export default function ClientHomeScreen() {
   const pickupTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Leaflet map (Web uniquement) ──────────────────────────────────────────
+  const [activeMapField, setActiveMapField] = useState<'pickup' | 'dropoff'>('dropoff');
+  const mapDivRef       = useRef<any>(null);
+  const leafletMapRef   = useRef<any>(null);
+  const pickupMarkerRef = useRef<any>(null);
+  const dropoffMarkerRef = useRef<any>(null);
+
   // ── Commande ──────────────────────────────────────────────────────────────
   const [vehicle, setVehicle]         = useState<VehicleType>('van_small');
   const [helpers, setHelpers]         = useState(0);
@@ -179,6 +186,163 @@ export default function ClientHomeScreen() {
 
     return () => { cancelled = true; };
   }, []);
+
+  // ── Initialisation Leaflet (Web seulement) ────────────────────────────────
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const initLat = pickupCoords?.lat ?? OMAN_CENTER.lat;
+    const initLng = pickupCoords?.lng ?? OMAN_CENTER.lng;
+
+    const loadAndInit = async () => {
+      // Injecter le CSS Leaflet une seule fois
+      if (!document.getElementById('leaflet-css')) {
+        const link = document.createElement('link');
+        link.id = 'leaflet-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+      }
+      // Charger le JS Leaflet
+      await new Promise<void>((resolve) => {
+        if ((window as any).L) { resolve(); return; }
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = () => resolve();
+        document.head.appendChild(script);
+      });
+
+      if (!mapDivRef.current || leafletMapRef.current) return;
+
+      const L = (window as any).L;
+
+      // Icônes personnalisées (fix bug Leaflet webpack)
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      const blueIcon = L.divIcon({
+        html: '<div style="width:14px;height:14px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
+        className: '', iconAnchor: [7, 7],
+      });
+      const redIcon = L.divIcon({
+        html: '<div style="width:14px;height:14px;background:#ef4444;border:3px solid white;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
+        className: '', iconAnchor: [7, 7],
+      });
+
+      const map = L.map(mapDivRef.current).setView([initLat, initLng], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(map);
+
+      // Marqueur départ (bleu)
+      pickupMarkerRef.current = L.marker([initLat, initLng], {
+        icon: blueIcon, draggable: true, title: 'Pickup',
+      }).addTo(map);
+
+      pickupMarkerRef.current.on('dragend', async (e: any) => {
+        const { lat, lng } = e.target.getLatLng();
+        setPickupCoords({ lat, lng });
+        const addr = await reverseGeocode(lat, lng);
+        if (addr) setPickupAddress(addr);
+      });
+
+      leafletMapRef.current = map;
+
+      // Clic sur la carte → pose le marqueur du champ actif
+      map.on('click', async (e: any) => {
+        const { lat, lng } = e.latlng;
+        // On lit l'état via un ref pour éviter les closures obsolètes
+        const field = (map as any)._activeMapField ?? 'dropoff';
+        if (field === 'pickup') {
+          if (pickupMarkerRef.current) pickupMarkerRef.current.setLatLng([lat, lng]);
+          setPickupCoords({ lat, lng });
+          const addr = await reverseGeocode(lat, lng);
+          if (addr) setPickupAddress(addr);
+        } else {
+          if (dropoffMarkerRef.current) {
+            dropoffMarkerRef.current.setLatLng([lat, lng]);
+          } else {
+            dropoffMarkerRef.current = L.marker([lat, lng], {
+              icon: redIcon, draggable: true, title: 'Dropoff',
+            }).addTo(map);
+            dropoffMarkerRef.current.on('dragend', async (ev: any) => {
+              const p = ev.target.getLatLng();
+              setDropoffCoords({ lat: p.lat, lng: p.lng });
+              const a = await reverseGeocode(p.lat, p.lng);
+              if (a) setDropoffAddress(a);
+            });
+          }
+          setDropoffCoords({ lat, lng });
+          const addr = await reverseGeocode(lat, lng);
+          if (addr) setDropoffAddress(addr);
+        }
+      });
+    };
+
+    loadAndInit();
+
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        pickupMarkerRef.current = null;
+        dropoffMarkerRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingLoc]); // relance quand la géoloc est prête
+
+  // ── Sync activeMapField → propriété interne de la map ────────────────────
+  useEffect(() => {
+    if (leafletMapRef.current) {
+      (leafletMapRef.current as any)._activeMapField = activeMapField;
+    }
+  }, [activeMapField]);
+
+  // ── Sync coordonnées → marqueur pickup Leaflet ────────────────────────────
+  useEffect(() => {
+    if (!pickupMarkerRef.current || !pickupCoords) return;
+    pickupMarkerRef.current.setLatLng([pickupCoords.lat, pickupCoords.lng]);
+    if (leafletMapRef.current && !dropoffCoords) {
+      leafletMapRef.current.panTo([pickupCoords.lat, pickupCoords.lng]);
+    }
+  }, [pickupCoords]);
+
+  // ── Sync coordonnées → marqueur dropoff Leaflet ───────────────────────────
+  useEffect(() => {
+    if (!dropoffCoords || !leafletMapRef.current) return;
+    const L = (window as any).L;
+    if (!L) return;
+    const redIcon = L.divIcon({
+      html: '<div style="width:14px;height:14px;background:#ef4444;border:3px solid white;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
+      className: '', iconAnchor: [7, 7],
+    });
+    if (dropoffMarkerRef.current) {
+      dropoffMarkerRef.current.setLatLng([dropoffCoords.lat, dropoffCoords.lng]);
+    } else {
+      dropoffMarkerRef.current = L.marker([dropoffCoords.lat, dropoffCoords.lng], {
+        icon: redIcon, draggable: true, title: 'Dropoff',
+      }).addTo(leafletMapRef.current);
+      dropoffMarkerRef.current.on('dragend', async (ev: any) => {
+        const p = ev.target.getLatLng();
+        setDropoffCoords({ lat: p.lat, lng: p.lng });
+        const a = await reverseGeocode(p.lat, p.lng);
+        if (a) setDropoffAddress(a);
+      });
+    }
+    // Ajuster la vue pour montrer les deux marqueurs
+    if (pickupCoords) {
+      leafletMapRef.current.fitBounds(
+        [[pickupCoords.lat, pickupCoords.lng], [dropoffCoords.lat, dropoffCoords.lng]],
+        { padding: [40, 40] }
+      );
+    }
+  }, [dropoffCoords]);
 
   // ── Subscription Supabase ─────────────────────────────────────────────────
   useEffect(() => {
@@ -344,7 +508,15 @@ export default function ClientHomeScreen() {
 
       {/* ── DÉPART ── */}
       <View className="flex-row items-start border-b border-slate-100 pb-2 mb-2 md:pb-4 md:mb-4" style={{ zIndex: 60 }}>
-        <View className="w-3 h-3 rounded-full bg-blue-600 mr-3 mt-3" />
+        <TouchableOpacity
+          onPress={() => Platform.OS === 'web' && setActiveMapField('pickup')}
+          style={{
+            width: 12, height: 12, borderRadius: 6, marginTop: 14, marginRight: 10,
+            backgroundColor: '#3b82f6',
+            borderWidth: activeMapField === 'pickup' && Platform.OS === 'web' ? 3 : 0,
+            borderColor: '#93c5fd',
+          }}
+        />
         <View style={{ flex: 1, position: 'relative' }}>
           {Platform.OS === 'web' ? (
             <>
@@ -356,6 +528,7 @@ export default function ClientHomeScreen() {
                 } as any}
                 value={pickupAddress}
                 onChangeText={handlePickupChange}
+                onFocus={() => setActiveMapField('pickup')}
                 placeholder={t('client.current_location')}
                 placeholderTextColor="#94a3b8"
               />
@@ -370,17 +543,10 @@ export default function ClientHomeScreen() {
                   const short = data.description.split(',').slice(0, 3).join(', ');
                   setPickupAddress(short);
                   if (details?.geometry?.location) {
-                    setPickupCoords({
-                      lat: details.geometry.location.lat,
-                      lng: details.geometry.location.lng,
-                    });
+                    setPickupCoords({ lat: details.geometry.location.lat, lng: details.geometry.location.lng });
                   }
                 }}
-                query={{
-                  key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-                  language: lang,
-                  components: 'country:om',
-                }}
+                query={{ key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY, language: lang, components: 'country:om' }}
                 styles={{
                   textInput: { fontSize: 15, backgroundColor: 'transparent', textAlign: isRTL ? 'right' : 'left', height: 40, paddingHorizontal: 0 },
                   container: { flex: 0 },
@@ -395,7 +561,15 @@ export default function ClientHomeScreen() {
 
       {/* ── DESTINATION ── */}
       <View className="flex-row items-start" style={{ zIndex: 50 }}>
-        <View className="w-3 h-3 rounded-sm bg-yellow-500 mr-3 mt-3" />
+        <TouchableOpacity
+          onPress={() => Platform.OS === 'web' && setActiveMapField('dropoff')}
+          style={{
+            width: 12, height: 12, borderRadius: 2, marginTop: 14, marginRight: 10,
+            backgroundColor: '#ef4444',
+            borderWidth: activeMapField === 'dropoff' && Platform.OS === 'web' ? 3 : 0,
+            borderColor: '#fca5a5',
+          }}
+        />
         <View style={{ flex: 1, position: 'relative' }}>
           {Platform.OS === 'web' ? (
             <>
@@ -407,6 +581,7 @@ export default function ClientHomeScreen() {
                 } as any}
                 value={dropoffAddress}
                 onChangeText={handleDropoffChange}
+                onFocus={() => setActiveMapField('dropoff')}
                 placeholder={t('client.dropoff')}
                 placeholderTextColor="#94a3b8"
               />
@@ -421,17 +596,10 @@ export default function ClientHomeScreen() {
                   const short = data.description.split(',').slice(0, 3).join(', ');
                   setDropoffAddress(short);
                   if (details?.geometry?.location) {
-                    setDropoffCoords({
-                      lat: details.geometry.location.lat,
-                      lng: details.geometry.location.lng,
-                    });
+                    setDropoffCoords({ lat: details.geometry.location.lat, lng: details.geometry.location.lng });
                   }
                 }}
-                query={{
-                  key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-                  language: lang,
-                  components: 'country:om',
-                }}
+                query={{ key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY, language: lang, components: 'country:om' }}
                 styles={{
                   textInput: { fontSize: 15, backgroundColor: 'transparent', textAlign: isRTL ? 'right' : 'left', height: 40, paddingHorizontal: 0 },
                   container: { flex: 0 },
@@ -443,6 +611,27 @@ export default function ClientHomeScreen() {
           )}
         </View>
       </View>
+
+      {/* Indicateur de mode clic (Web seulement) */}
+      {Platform.OS === 'web' && (
+        <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+          <Text style={{ fontSize: 11, color: '#94a3b8', marginRight: 6 }}>🖱 Clic sur la carte :</Text>
+          <TouchableOpacity
+            onPress={() => setActiveMapField('pickup')}
+            style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, marginRight: 4,
+              backgroundColor: activeMapField === 'pickup' ? '#3b82f6' : '#f1f5f9' }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: activeMapField === 'pickup' ? 'white' : '#64748b' }}>● Départ</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setActiveMapField('dropoff')}
+            style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20,
+              backgroundColor: activeMapField === 'dropoff' ? '#ef4444' : '#f1f5f9' }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: activeMapField === 'dropoff' ? 'white' : '#64748b' }}>■ Arrivée</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
     </View>
   );
@@ -586,13 +775,11 @@ export default function ClientHomeScreen() {
             <Text className="text-slate-500 mt-3 font-medium">{t('common.loading')}</Text>
           </View>
         ) : Platform.OS === 'web' ? (
-          <View className="flex-1 bg-slate-200">
-            {React.createElement('iframe', {
-              src: `https://www.openstreetmap.org/export/embed.html?bbox=${(location?.coords.longitude ?? OMAN_CENTER.lng) - 0.02}%2C${(location?.coords.latitude ?? OMAN_CENTER.lat) - 0.02}%2C${(location?.coords.longitude ?? OMAN_CENTER.lng) + 0.02}%2C${(location?.coords.latitude ?? OMAN_CENTER.lat) + 0.02}&layer=mapnik&marker=${location?.coords.latitude ?? OMAN_CENTER.lat}%2C${location?.coords.longitude ?? OMAN_CENTER.lng}`,
-              style: { width: '100%', height: '100%', border: 'none' },
-              title: t('client.home_title'),
-            })}
-          </View>
+          // Carte Leaflet interactive (marqueurs départ+arrivée + clic)
+          React.createElement('div', {
+            ref: mapDivRef,
+            style: { flex: 1, width: '100%', height: '100%', minHeight: 300 },
+          })
         ) : location ? (
           <MapView
             className="flex-1"
