@@ -15,7 +15,13 @@ if (Platform.OS !== 'web') {
 }
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+
+// Import conditionnel pour éviter le crash sur Web
+// (react-native-google-places-autocomplete ne supporte pas le navigateur)
+let GooglePlacesInput: any = null;
+if (Platform.OS !== 'web') {
+  GooglePlacesInput = require('react-native-google-places-autocomplete').GooglePlacesAutocomplete;
+}
 
 type VehicleType = 'van_small' | 'van_large' | 'truck';
 
@@ -352,86 +358,121 @@ export default function ClientHomeScreen() {
         {/* Si aucune course active, on affiche les champs de saisie, sinon on cache pour laisser la carte visible */}
         {!activeRide && (
           <View className="absolute top-12 md:top-16 left-4 md:left-8 right-4 md:right-8 lg:left-48 lg:right-48 bg-white rounded-2xl shadow-xl shadow-slate-900/10 p-3 md:p-5 z-50">
+
+            {/* ── Champ DÉPART ────────────────────────────────────── */}
             <View className="flex-row items-start border-b border-slate-100 pb-2 mb-2 md:pb-4 md:mb-4 z-50">
               <View className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-blue-600 mr-3 md:mr-4 mt-3" />
               <View className="flex-1">
-                <GooglePlacesAutocomplete
-                  placeholder={t('client.current_location')}
-                  fetchDetails={true}
-                  onPress={(data, details = null) => {
-                    setPickupAddress(data.description);
-                  }}
-                  query={{
-                    key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-                    language: locale.substring(0, 2),
-                    components: 'country:om',
-                  }}
-                  styles={{
-                    textInput: {
-                      fontSize: 16,
-                      backgroundColor: 'transparent',
-                      textAlign: isRTL ? 'right' : 'left',
-                      height: 40,
-                      paddingHorizontal: 0,
-                    },
-                    container: { flex: 0 },
-                    listView: { 
-                      position: 'absolute', 
-                      top: 45, 
-                      backgroundColor: 'white', 
-                      zIndex: 100, 
-                      elevation: 5,
-                      width: '100%',
-                      borderRadius: 8
-                    },
-                  }}
-                  textInputProps={{
-                    value: pickupAddress,
-                    onChangeText: setPickupAddress
-                  }}
-                />
+                {Platform.OS === 'web' ? (
+                  // Web : TextInput classique (GooglePlaces non supporté sur navigateur)
+                  <TextInput
+                    className="flex-1 text-slate-800 text-base font-semibold py-1"
+                    style={{ textAlign: isRTL ? 'right' : 'left', height: 40, outlineStyle: 'none' } as any}
+                    value={pickupAddress}
+                    onChangeText={setPickupAddress}
+                    placeholder={t('client.current_location')}
+                    placeholderTextColor="#94a3b8"
+                  />
+                ) : (
+                  // Mobile : Autocomplétion Google Places native
+                  GooglePlacesInput && (
+                    <GooglePlacesInput
+                      placeholder={t('client.current_location')}
+                      fetchDetails={true}
+                      onPress={(data: any) => {
+                        setPickupAddress(data.description);
+                      }}
+                      query={{
+                        key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+                        language: locale.substring(0, 2),
+                        components: 'country:om',
+                      }}
+                      styles={{
+                        textInput: {
+                          fontSize: 16,
+                          backgroundColor: 'transparent',
+                          textAlign: isRTL ? 'right' : 'left',
+                          height: 40,
+                          paddingHorizontal: 0,
+                        },
+                        container: { flex: 0 },
+                        listView: {
+                          position: 'absolute',
+                          top: 45,
+                          backgroundColor: 'white',
+                          zIndex: 100,
+                          elevation: 5,
+                          width: '100%',
+                          borderRadius: 8,
+                        },
+                      }}
+                      textInputProps={{
+                        value: pickupAddress,
+                        onChangeText: setPickupAddress,
+                      }}
+                    />
+                  )
+                )}
               </View>
             </View>
+
+            {/* ── Champ DESTINATION ───────────────────────────────── */}
             <View className="flex-row items-start z-40">
               <View className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-yellow-500 mr-3 md:mr-4 mt-3" />
               <View className="flex-1">
-                <GooglePlacesAutocomplete
-                  placeholder={t('client.dropoff')}
-                  fetchDetails={true}
-                  onPress={(data, details = null) => {
-                    setDropoffAddress(data.description);
-                  }}
-                  query={{
-                    key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-                    language: locale.substring(0, 2),
-                    components: 'country:om',
-                  }}
-                  styles={{
-                    textInput: {
-                      fontSize: 16,
-                      backgroundColor: 'transparent',
-                      textAlign: isRTL ? 'right' : 'left',
-                      height: 40,
-                      paddingHorizontal: 0,
-                    },
-                    container: { flex: 0 },
-                    listView: { 
-                      position: 'absolute', 
-                      top: 45, 
-                      backgroundColor: 'white', 
-                      zIndex: 100, 
-                      elevation: 5,
-                      width: '100%',
-                      borderRadius: 8
-                    },
-                  }}
-                  textInputProps={{
-                    value: dropoffAddress,
-                    onChangeText: setDropoffAddress
-                  }}
-                />
+                {Platform.OS === 'web' ? (
+                  // Web : TextInput classique
+                  <TextInput
+                    className="flex-1 text-slate-800 text-base font-semibold py-1"
+                    style={{ textAlign: isRTL ? 'right' : 'left', height: 40, outlineStyle: 'none' } as any}
+                    value={dropoffAddress}
+                    onChangeText={setDropoffAddress}
+                    placeholder={t('client.dropoff')}
+                    placeholderTextColor="#94a3b8"
+                  />
+                ) : (
+                  // Mobile : Autocomplétion Google Places native
+                  GooglePlacesInput && (
+                    <GooglePlacesInput
+                      placeholder={t('client.dropoff')}
+                      fetchDetails={true}
+                      onPress={(data: any) => {
+                        setDropoffAddress(data.description);
+                      }}
+                      query={{
+                        key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+                        language: locale.substring(0, 2),
+                        components: 'country:om',
+                      }}
+                      styles={{
+                        textInput: {
+                          fontSize: 16,
+                          backgroundColor: 'transparent',
+                          textAlign: isRTL ? 'right' : 'left',
+                          height: 40,
+                          paddingHorizontal: 0,
+                        },
+                        container: { flex: 0 },
+                        listView: {
+                          position: 'absolute',
+                          top: 45,
+                          backgroundColor: 'white',
+                          zIndex: 100,
+                          elevation: 5,
+                          width: '100%',
+                          borderRadius: 8,
+                        },
+                      }}
+                      textInputProps={{
+                        value: dropoffAddress,
+                        onChangeText: setDropoffAddress,
+                      }}
+                    />
+                  )
+                )}
               </View>
             </View>
+
           </View>
         )}
       </View>
