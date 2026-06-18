@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { useTranslation } from '../../context/LanguageContext';
+import { Ionicons } from '@expo/vector-icons';
 
 // ── Import conditionnel des libs natives (ne jamais importer statiquement) ──
 let MapView: any = View;
@@ -501,6 +502,45 @@ export default function ClientHomeScreen() {
       </View>
     );
   };
+  // ── Locate me handler ─────────────────────────────────────────────────────
+  const handleLocateMe = async (target: 'pickup' | 'dropoff') => {
+    setLoadingLoc(true);
+    try {
+      let coords: Coords;
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
+        coords = await new Promise<Coords>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            (err) => reject(err),
+            { timeout: 8000 }
+          );
+        });
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(t('common.attention'), t('client.location_required'));
+          setLoadingLoc(false);
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+      }
+
+      const addr = await reverseGeocode(coords.lat, coords.lng);
+
+      if (target === 'pickup') {
+        setPickupCoords(coords);
+        if (addr) setPickupAddress(addr);
+      } else {
+        setDropoffCoords(coords);
+        if (addr) setDropoffAddress(addr);
+      }
+    } catch (e) {
+      Alert.alert(t('common.error'), 'Impossible de récupérer la position');
+    } finally {
+      setLoadingLoc(false);
+    }
+  };
 
   // ── Render : Section adresses ─────────────────────────────────────────────
   const renderAddressCard = () => (
@@ -570,6 +610,12 @@ export default function ClientHomeScreen() {
             )
           )}
         </View>
+        <TouchableOpacity
+          onPress={() => handleLocateMe('pickup')}
+          className="p-2 ml-2 bg-slate-50 rounded-full"
+        >
+          <Ionicons name="locate" size={20} color="#3b82f6" />
+        </TouchableOpacity>
       </View>
 
       {/* ── DESTINATION ── */}
@@ -623,6 +669,12 @@ export default function ClientHomeScreen() {
             )
           )}
         </View>
+        <TouchableOpacity
+          onPress={() => handleLocateMe('dropoff')}
+          className="p-2 ml-2 bg-slate-50 rounded-full"
+        >
+          <Ionicons name="locate" size={20} color="#ef4444" />
+        </TouchableOpacity>
       </View>
 
       {/* Indicateur de mode clic (Web seulement) */}
