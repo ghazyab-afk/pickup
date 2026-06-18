@@ -4,16 +4,13 @@ import {
   Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTranslation } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { sendWhatsAppOTP, verifyOTP } from '../../services/phoneAuthService';
 import LanguageSelector from '../../components/LanguageSelector';
 
 const OTP_LENGTH = 6;
-const COUNTRY_CODE = '+968';
 
 export default function PhoneAuthScreen({ navigation }: any) {
-  const { t } = useTranslation();
   const { devLogin } = useAuth();
   const [phone, setPhone] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
@@ -23,19 +20,25 @@ export default function PhoneAuthScreen({ navigation }: any) {
 
   // ── Send OTP (via Supabase Edge Function) ─────────────────────────
   const handleSendOtp = async () => {
-    if (phone.length < 7) {
-      Alert.alert(t('common.attention'), t('phone_auth.invalid_phone'));
+    // Nettoyage basique (on garde le + et les chiffres)
+    const cleanedPhone = phone.replace(/[^\d+]/g, '');
+
+    if (!cleanedPhone.startsWith('+') || cleanedPhone.length < 8) {
+      Alert.alert('Attention', 'Veuillez saisir un numéro valide avec indicatif (ex: +33612345678)');
       return;
     }
+
     setLoading(true);
     
-    const result = await sendWhatsAppOTP(phone);
+    // On envoie le numéro complet avec l'indicatif
+    const result = await sendWhatsAppOTP(cleanedPhone);
     setLoading(false);
 
     if (result.success) {
+      setPhone(cleanedPhone); // On s'assure d'avoir le format nettoyé pour la suite
       setStep('otp');
     } else {
-      Alert.alert(t('common.error'), result.error || 'Failed to send OTP');
+      Alert.alert('Erreur', result.error || 'Échec de l\'envoi du code WhatsApp');
     }
   };
 
@@ -82,7 +85,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
   const handleVerifyOtp = async () => {
     const code = otp.join('');
     if (code.length < OTP_LENGTH) {
-      Alert.alert(t('common.attention'), t('phone_auth.incomplete_otp'));
+      Alert.alert('Attention', 'Veuillez saisir le code complet');
       return;
     }
     setLoading(true);
@@ -91,13 +94,12 @@ export default function PhoneAuthScreen({ navigation }: any) {
     setLoading(false);
 
     if (result.success) {
-      // DEV_MODE workaround: Since Supabase onAuthStateChange won't fire for a fake session
       if (result.session?.access_token === 'dev-token' && devLogin) {
         devLogin(result.session);
       }
-      Alert.alert(t('common.success'), t('phone_auth.verified'));
+      // Succès silencieux, Supabase onAuthStateChange va prendre le relais pour naviguer
     } else {
-      Alert.alert(t('common.error'), result.error || 'Invalid OTP');
+      Alert.alert('Erreur', result.error || 'Code invalide ou expiré');
     }
   };
 
@@ -110,28 +112,28 @@ export default function PhoneAuthScreen({ navigation }: any) {
         <LanguageSelector />
       </View>
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+        contentContainerStyle={{ flexGrow: 1 }}
         className="px-6 md:px-0"
         keyboardShouldPersistTaps="handled"
       >
-        <View className="w-full md:max-w-md md:mx-auto lg:max-w-lg px-0 md:px-8 py-10">
+        <View className="flex-1 justify-center w-full md:max-w-md md:mx-auto lg:max-w-lg px-0 md:px-8 py-10">
 
           {/* Brand header */}
           <View className="items-center mb-10 md:mb-14">
             <View className="w-20 h-20 md:w-24 md:h-24 bg-yellow-400 rounded-3xl items-center justify-center mb-5 shadow-md">
               <Ionicons name="car-sport" size={40} color="#1e293b" />
             </View>
-            <Text className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-800">
-              {step === 'phone' ? t('phone_auth.title') : t('phone_auth.otp_title')}
+            <Text className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-800 text-center">
+              {step === 'phone' ? 'Bienvenue sur Pickup' : 'Validation WhatsApp'}
             </Text>
             <Text className="text-base md:text-lg lg:text-xl text-slate-400 font-medium mt-2 text-center">
               {step === 'phone' ? (
-                t('phone_auth.subtitle')
+                'Commandez un transport en quelques clics'
               ) : (
                 <Text>
-                  {t('phone_auth.otp_subtitle')}{' '}
-                  <Text style={{ direction: 'ltr' }}>
-                    {COUNTRY_CODE} {phone}
+                  Un code de validation OTP vous a été envoyé sur votre compte WhatsApp au{' '}
+                  <Text style={{ direction: 'ltr', fontWeight: 'bold', color: '#64748b' }}>
+                    {phone}
                   </Text>
                 </Text>
               )}
@@ -142,30 +144,27 @@ export default function PhoneAuthScreen({ navigation }: any) {
             /* ── Phone Input ─────────────────────────────────────────── */
             <View>
               <Text className="text-sm md:text-base font-bold text-slate-600 mb-2 ms-1">
-                {t('phone_auth.phone_label')}
+                Numéro de téléphone
               </Text>
               <View 
                 className="flex-row items-center bg-white border-2 border-slate-200 rounded-2xl overflow-hidden focus-within:border-blue-500 h-16 md:h-18"
                 style={{ flexDirection: 'row', direction: 'ltr' }}
               >
-                {/* Country code prefix */}
-                <View className="flex-row items-center px-4 border-e-2 border-slate-100 h-full bg-slate-50">
-                  <Text className="text-2xl me-2">🇴🇲</Text>
-                  <Text className="text-base md:text-lg font-bold text-slate-700">{COUNTRY_CODE}</Text>
-                </View>
                 <TextInput
                   className="flex-1 px-4 text-lg md:text-xl font-semibold text-slate-800"
                   style={{ textAlign: 'left' }}
-                  placeholder="9X XXX XXX"
+                  placeholder="+33 6 12 34 56 78"
                   placeholderTextColor="#94a3b8"
                   keyboardType="phone-pad"
                   value={phone}
                   onChangeText={setPhone}
-                  maxLength={10}
                   returnKeyType="done"
                   onSubmitEditing={handleSendOtp}
                 />
               </View>
+              <Text className="text-xs text-slate-400 mt-2 ms-1 text-center">
+                Veuillez inclure l'indicatif de votre pays (ex: +33, +968)
+              </Text>
 
               <TouchableOpacity
                 onPress={handleSendOtp}
@@ -177,24 +176,14 @@ export default function PhoneAuthScreen({ navigation }: any) {
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text className="text-white text-lg md:text-xl font-extrabold">
-                    {t('phone_auth.send_otp')}
+                    Recevoir le code
                   </Text>
                 )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => navigation?.goBack()}
-                className="mt-4 items-center py-3"
-              >
-                <Text className="text-slate-400 text-base md:text-lg font-medium">
-                  {t('phone_auth.back_to_email')}
-                </Text>
               </TouchableOpacity>
             </View>
           ) : (
             /* ── OTP Input ───────────────────────────────────────────── */
             <View>
-              {/* Force LTR direction here to maintain 1-2-3-4-5-6 box ordering in Arabic */}
               <View 
                 className="flex-row justify-center gap-2 md:gap-3 mb-8"
                 style={{ flexDirection: 'row', direction: 'ltr' }}
@@ -229,7 +218,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                   <View className="flex-row items-center">
                     <Ionicons name="checkmark-circle-outline" size={22} color="white" />
                     <Text className="text-white text-lg md:text-xl font-extrabold ms-2">
-                      {t('phone_auth.verify')}
+                      Vérifier le code
                     </Text>
                   </View>
                 )}
@@ -237,15 +226,26 @@ export default function PhoneAuthScreen({ navigation }: any) {
 
               <TouchableOpacity
                 onPress={() => { setStep('phone'); setOtp(Array(OTP_LENGTH).fill('')); }}
-                className="mt-4 items-center py-3"
+                className="mt-6 items-center py-3"
               >
                 <Text className="text-blue-500 text-base md:text-lg font-semibold">
-                  {t('phone_auth.resend_otp')}
+                  Renvoyer un code WhatsApp
                 </Text>
               </TouchableOpacity>
             </View>
           )}
+
         </View>
+
+        {/* ── Lien Espace Chauffeur ─────────────────────────────────── */}
+        <View className="pb-8 pt-4 items-center">
+          <TouchableOpacity onPress={() => navigation?.navigate('Login')}>
+            <Text className="text-xs text-slate-400 font-medium tracking-wide">
+              Espace Chauffeur / Partenaire
+            </Text>
+          </TouchableOpacity>
+        </View>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
