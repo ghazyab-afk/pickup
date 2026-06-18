@@ -10,8 +10,22 @@ import LanguageSelector from '../../components/LanguageSelector';
 
 const OTP_LENGTH = 6;
 
+const COUNTRIES = [
+  { name: 'Oman', flag: '🇴🇲', code: '+968' },
+  { name: 'Saudi Arabia', flag: '🇸🇦', code: '+966' },
+  { name: 'UAE', flag: '🇦🇪', code: '+971' },
+  { name: 'Qatar', flag: '🇶🇦', code: '+974' },
+  { name: 'Kuwait', flag: '🇰🇼', code: '+965' },
+  { name: 'Bahrain', flag: '🇧🇭', code: '+973' },
+  { name: 'France', flag: '🇫🇷', code: '+33' },
+  { name: 'UK', flag: '🇬🇧', code: '+44' },
+  { name: 'USA', flag: '🇺🇸', code: '+1' },
+];
+
 export default function PhoneAuthScreen({ navigation }: any) {
   const { devLogin } = useAuth();
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
+  const [showCountryModal, setShowCountryModal] = useState(false);
   const [phone, setPhone] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
@@ -20,22 +34,23 @@ export default function PhoneAuthScreen({ navigation }: any) {
 
   // ── Send OTP (via Supabase Edge Function) ─────────────────────────
   const handleSendOtp = async () => {
-    // Nettoyage basique (on garde le + et les chiffres)
-    const cleanedPhone = phone.replace(/[^\d+]/g, '');
+    // Nettoyage basique (on garde que les chiffres)
+    const cleanedPhone = phone.replace(/[^\d]/g, '');
 
-    if (!cleanedPhone.startsWith('+') || cleanedPhone.length < 8) {
-      Alert.alert('Attention', 'Veuillez saisir un numéro valide avec indicatif (ex: +33612345678)');
+    if (cleanedPhone.length < 6) {
+      Alert.alert('Attention', 'Veuillez saisir un numéro de téléphone valide');
       return;
     }
 
     setLoading(true);
     
-    // On envoie le numéro complet avec l'indicatif
-    const result = await sendWhatsAppOTP(cleanedPhone);
+    // On envoie le numéro complet avec l'indicatif choisi
+    const fullPhone = `${selectedCountry.code}${cleanedPhone}`;
+    const result = await sendWhatsAppOTP(fullPhone);
     setLoading(false);
 
     if (result.success) {
-      setPhone(cleanedPhone); // On s'assure d'avoir le format nettoyé pour la suite
+      setPhone(cleanedPhone); // Garder le numéro propre dans l'input
       setStep('otp');
     } else {
       Alert.alert('Erreur', result.error || 'Échec de l\'envoi du code WhatsApp');
@@ -133,7 +148,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                 <Text>
                   Un code de validation OTP vous a été envoyé sur votre compte WhatsApp au{' '}
                   <Text style={{ direction: 'ltr', fontWeight: 'bold', color: '#64748b' }}>
-                    {phone}
+                    {selectedCountry.code} {phone}
                   </Text>
                 </Text>
               )}
@@ -150,10 +165,23 @@ export default function PhoneAuthScreen({ navigation }: any) {
                 className="flex-row items-center bg-white border-2 border-slate-200 rounded-2xl overflow-hidden focus-within:border-blue-500 h-16 md:h-18"
                 style={{ flexDirection: 'row', direction: 'ltr' }}
               >
+                {/* Sélecteur de pays cliquable */}
+                <TouchableOpacity
+                  onPress={() => setShowCountryModal(true)}
+                  className="flex-row items-center px-4 border-e-2 border-slate-100 h-full bg-slate-50"
+                  activeOpacity={0.7}
+                >
+                  <Text className="text-2xl me-2">{selectedCountry.flag}</Text>
+                  <Text className="text-base md:text-lg font-bold text-slate-700">
+                    {selectedCountry.code}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#64748b" style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+
                 <TextInput
                   className="flex-1 px-4 text-lg md:text-xl font-semibold text-slate-800"
                   style={{ textAlign: 'left' }}
-                  placeholder="+33 6 12 34 56 78"
+                  placeholder="9X XXX XXX"
                   placeholderTextColor="#94a3b8"
                   keyboardType="phone-pad"
                   value={phone}
@@ -163,7 +191,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                 />
               </View>
               <Text className="text-xs text-slate-400 mt-2 ms-1 text-center">
-                Veuillez inclure l'indicatif de votre pays (ex: +33, +968)
+                Saisissez votre numéro sans l'indicatif
               </Text>
 
               <TouchableOpacity
@@ -247,6 +275,38 @@ export default function PhoneAuthScreen({ navigation }: any) {
         </View>
 
       </ScrollView>
+
+      {/* ── Modal Sélecteur de Pays ──────────────────────────────────────── */}
+      <Modal visible={showCountryModal} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-end bg-black/60">
+          <View className="bg-white rounded-t-3xl max-h-[70%]">
+            <View className="flex-row justify-between items-center p-6 border-b border-slate-100">
+              <Text className="text-xl font-black text-slate-800">Choisir un pays</Text>
+              <TouchableOpacity onPress={() => setShowCountryModal(false)} className="bg-slate-100 p-2 rounded-full">
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView className="p-4">
+              {COUNTRIES.map((country, index) => (
+                <TouchableOpacity
+                  key={country.code + index}
+                  onPress={() => {
+                    setSelectedCountry(country);
+                    setShowCountryModal(false);
+                  }}
+                  className={`flex-row items-center p-4 mb-2 rounded-xl border ${selectedCountry.code === country.code ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white'}`}
+                >
+                  <Text className="text-3xl mr-4">{country.flag}</Text>
+                  <Text className="flex-1 text-lg font-semibold text-slate-800">{country.name}</Text>
+                  <Text className="text-lg font-bold text-slate-500">{country.code}</Text>
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }
