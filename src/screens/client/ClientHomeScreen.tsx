@@ -386,7 +386,7 @@ export default function ClientHomeScreen() {
       if (data.driver_id) {
         setLastDriverId(data.driver_id);
         const { data: dData } = await supabase
-          .from('profiles').select('first_name, phone_number, avatar_url').eq('id', data.driver_id).single();
+          .from('users').select('first_name, phone_number, avatar_url').eq('id', data.driver_id).single();
         if (dData) driverInfo = dData;
       }
       setActiveRide({ ...data, driver: driverInfo });

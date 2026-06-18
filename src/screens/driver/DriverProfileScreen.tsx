@@ -54,7 +54,7 @@ export default function DriverProfileScreen() {
       const publicUrl = publicData.publicUrl;
 
       const { error: updateError } = await supabase
-        .from('profiles')
+        .from('users')
         .update({ avatar_url: publicUrl })
         .eq('id', profile?.id);
 
