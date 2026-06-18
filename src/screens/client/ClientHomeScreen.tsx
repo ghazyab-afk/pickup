@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ActivityIndicator,
-  Alert, ScrollView, Modal, Platform, FlatList,
+  Alert, ScrollView, Modal, Platform, FlatList, Image
 } from 'react-native';
 import * as Location from 'expo-location';
 import { useTranslation } from '../../context/LanguageContext';
@@ -23,6 +23,7 @@ if (Platform.OS !== 'web') {
 
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
+import ReviewModal from './ReviewModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type VehicleType = 'van_small' | 'van_large' | 'truck';
@@ -40,7 +41,7 @@ interface ActiveRide {
   requested_vehicle: string;
   driver_id?: string;
   distance_km: number;
-  driver?: { first_name: string; phone_number: string; };
+  driver?: { first_name: string; phone_number: string; avatar_url?: string };
 }
 
 // ── Constantes ─────────────────────────────────────────────────────────────
@@ -128,10 +129,12 @@ export default function ClientHomeScreen() {
   const [helpers, setHelpers]         = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ── Course active ─────────────────────────────────────────────────────────
   const [activeRide, setActiveRide]             = useState<ActiveRide | null>(null);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [completedPrice, setCompletedPrice]     = useState(0);
+  const [showReviewModal, setShowReviewModal]   = useState(false);
+  const [completedRideId, setCompletedRideId]   = useState<string | null>(null);
+  const [lastDriverId, setLastDriverId]         = useState<string | null>(null);
 
   // ── Distance & prix calculés dynamiquement ────────────────────────────────
   const distanceKm: number = pickupCoords && dropoffCoords
@@ -356,6 +359,8 @@ export default function ClientHomeScreen() {
         (payload: any) => {
           if (payload.new?.status === 'completed') {
             setCompletedPrice(payload.new.price_calculated);
+            setCompletedRideId(payload.new.id);
+            setLastDriverId(payload.new.driver_id);
             setShowCompletedModal(true);
           }
           fetchActiveRide();
@@ -379,8 +384,9 @@ export default function ClientHomeScreen() {
     if (!error && data) {
       let driverInfo;
       if (data.driver_id) {
+        setLastDriverId(data.driver_id);
         const { data: dData } = await supabase
-          .from('users').select('first_name, phone_number').eq('id', data.driver_id).single();
+          .from('profiles').select('first_name, phone_number, avatar_url').eq('id', data.driver_id).single();
         if (dData) driverInfo = dData;
       }
       setActiveRide({ ...data, driver: driverInfo });
@@ -715,16 +721,28 @@ export default function ClientHomeScreen() {
           <Text className={`text-lg md:text-xl lg:text-2xl font-extrabold ${s.color}`}>{s.text}</Text>
         </View>
         <View className="flex-row justify-between items-center mb-6 md:mb-8">
-          <View className="flex-1">
-            <Text className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t('client.driver')}</Text>
-            {activeRide.driver ? (
-              <View>
-                <Text className="text-lg md:text-xl font-bold text-slate-800">{activeRide.driver.first_name || t('client.anonymous')}</Text>
-                <Text className="text-slate-500 font-medium text-base">{t('client.vehicle')} : {activeRide.requested_vehicle?.replace('van_', '').toUpperCase()}</Text>
-              </View>
-            ) : (
-              <Text className="text-slate-500 font-medium italic text-base">{t('client.waiting_assignment')}</Text>
-            )}
+          <View className="flex-row items-center flex-1">
+            <View className="w-14 h-14 bg-slate-200 rounded-full mr-4 border-2 border-white shadow-sm overflow-hidden items-center justify-center">
+              {activeRide.driver?.avatar_url ? (
+                <Image source={{ uri: activeRide.driver.avatar_url }} style={{ width: '100%', height: '100%' }} />
+              ) : (
+                <Text className="text-xl">🧑‍✈️</Text>
+              )}
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t('client.driver')}</Text>
+              {activeRide.driver ? (
+                <View>
+                  <Text className="text-lg md:text-xl font-bold text-slate-800">{activeRide.driver.first_name || t('client.anonymous')}</Text>
+                  <View className="flex-row items-center mt-1">
+                    <Text className="text-sm font-medium text-slate-500 mr-2">{t('client.vehicle')} : {activeRide.requested_vehicle?.replace('van_', '').toUpperCase()}</Text>
+                    <Text className="text-yellow-500 font-bold text-sm">⭐ 4.8</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text className="text-slate-500 font-medium italic text-base">{t('client.waiting_assignment')}</Text>
+              )}
+            </View>
           </View>
           <View className="items-end border-l border-slate-100 pl-4">
             <Text className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t('client.price')}</Text>
@@ -825,12 +843,29 @@ export default function ClientHomeScreen() {
               <Text className="text-slate-500 text-sm font-bold uppercase tracking-widest mb-2">{t('client.amount_to_pay')}</Text>
               <Text className="text-5xl font-black text-green-600">{completedPrice} <Text className="text-2xl">{t('common.currency')}</Text></Text>
             </View>
-            <TouchableOpacity onPress={() => setShowCompletedModal(false)} className="w-full bg-slate-800 rounded-2xl py-4 items-center">
+            <TouchableOpacity onPress={() => {
+              setShowCompletedModal(false);
+              if (completedRideId && lastDriverId) {
+                setShowReviewModal(true);
+              }
+            }} className="w-full bg-slate-800 rounded-2xl py-4 items-center">
               <Text className="text-white text-lg font-bold">{t('client.close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* Modal d'Avis */}
+      {completedRideId && lastDriverId && user && (
+        <ReviewModal
+          visible={showReviewModal}
+          rideId={completedRideId}
+          clientId={user.id}
+          driverId={lastDriverId}
+          onClose={() => setShowReviewModal(false)}
+          onSubmitSuccess={() => {}}
+        />
+      )}
 
       {/* ── SECTION CARTE ── */}
       <View className="flex-[2] relative z-10">
