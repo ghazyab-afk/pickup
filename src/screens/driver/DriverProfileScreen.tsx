@@ -5,6 +5,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from '../../context/LanguageContext';
 import { supabase } from '../../services/supabase';
 
+interface UserProfile {
+  id: string;
+  first_name: string;
+  status: string;
+  avatar_url?: string;
+}
+
 export default function DriverProfileScreen() {
   const { signOut, profile } = useAuth();
   const { t } = useTranslation();

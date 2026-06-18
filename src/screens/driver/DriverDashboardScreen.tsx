@@ -36,6 +36,11 @@ export default function DriverDashboardScreen({ navigation }: any) {
         { event: '*', schema: 'public', table: 'rides' },
         (payload) => {
           // On rafraîchit la liste complète à chaque changement (insertion, update)
+          fetchRides();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(subscription);
     };
