@@ -7,6 +7,17 @@ import AuthStack from './AuthStack';
 import ClientNavigator from './ClientNavigator';
 import DriverNavigator from './DriverNavigator';
 import CompleteProfileScreen from '../screens/auth/CompleteProfileScreen';
+import ThawaniDepositScreen from '../screens/client/ThawaniDepositScreen';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+const ClientStack = createNativeStackNavigator();
+
+const ClientFlow = () => (
+  <ClientStack.Navigator screenOptions={{ headerShown: false }}>
+    <ClientStack.Screen name="ClientMain" component={ClientNavigator} />
+    <ClientStack.Screen name="ThawaniDeposit" component={ThawaniDepositScreen} />
+  </ClientStack.Navigator>
+);
 
 const PERSISTENCE_KEY = 'NAVIGATION_STATE_V1';
 
@@ -59,7 +70,7 @@ export default function AppNavigator() {
       ) : profile.role === 'driver' ? (
         <DriverNavigator />
       ) : (
-        <ClientNavigator />
+        <ClientFlow />
       )}
     </NavigationContainer>
   );

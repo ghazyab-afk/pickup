@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Platform } from 'react-native';
 import { supabase } from '../../services/supabase';
 import { useTranslation } from '../../context/LanguageContext';
+import * as Device from 'expo-device';
+import * as SecureStore from 'expo-secure-store';
 
 export default function RegisterScreen({ navigation }: any) {
   const { t } = useTranslation();
@@ -12,6 +14,32 @@ export default function RegisterScreen({ navigation }: any) {
   const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ── Genere ou récupère un identifiant unique d'appareil ──────────────────
+  const getDeviceId = async (): Promise<string> => {
+    if (Platform.OS === 'web') {
+      // Sur web: utiliser localStorage pour stocker un ID persistant
+      const stored = localStorage.getItem('_pickup_device_id');
+      if (stored) return stored;
+      const newId = `web-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+      localStorage.setItem('_pickup_device_id', newId);
+      return newId;
+    }
+    // Sur mobile: utiliser SecureStore pour la persistance cross-sessions
+    const DEVICE_KEY = 'pickup_device_id';
+    const stored = await SecureStore.getItemAsync(DEVICE_KEY);
+    if (stored) return stored;
+    // Générer un nouvel ID basé sur les caractéristiques hardware
+    const hardware = [
+      Device.brand,
+      Device.modelName,
+      Device.osInternalBuildId,
+      Device.totalMemory,
+    ].join('-');
+    const newId = `mobile-${hardware}-${Math.random().toString(36).substring(2)}`;
+    await SecureStore.setItemAsync(DEVICE_KEY, newId);
+    return newId;
+  };
+
   const handleRegister = async () => {
     if (!email || !password || !firstName || !lastName) {
       Alert.alert(t('common.error'), t('common.error'));
@@ -20,6 +48,24 @@ export default function RegisterScreen({ navigation }: any) {
     
     setLoading(true);
     
+    // ── Vérification Device ID ──
+    const deviceId = await getDeviceId();
+    const { data: blockedDevice } = await supabase
+      .from('users')
+      .select('id')
+      .eq('device_id', deviceId)
+      .eq('is_blocked', true)
+      .maybeSingle();
+
+    if (blockedDevice) {
+      Alert.alert(
+        'Accès refusé',
+        'Ce compte a été suspendu pour fraude. Cet appareil ne peut plus créer de compte.'
+      );
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password,
@@ -37,6 +83,7 @@ export default function RegisterScreen({ navigation }: any) {
         role: role,
         first_name: firstName,
         last_name: lastName,
+        device_id: deviceId,
       });
 
       if (profileError) {

@@ -94,8 +94,10 @@ async function nominatimSearch(query: string, lang: string): Promise<NominatimRe
   }
 }
 
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
+
 // ══════════════════════════════════════════════════════════════════════════
-export default function ClientHomeScreen() {
+export default function ClientHomeScreen({ navigation }: any) {
   const { user } = useAuth();
   const { t, locale } = useTranslation();
   const isRTL = locale.startsWith('ar');
@@ -124,10 +126,25 @@ export default function ClientHomeScreen() {
   const pickupMarkerRef = useRef<any>(null);
   const dropoffMarkerRef = useRef<any>(null);
 
-  // ── Commande ──────────────────────────────────────────────────────────────
   const [vehicle, setVehicle]         = useState<VehicleType>('van_small');
   const [helpers, setHelpers]         = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reservationMode, setReservationMode] = useState<'immediate' | 'scheduled'>('immediate');
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+
+  const handleConfirmDate = (date: Date) => {
+    const minDate = new Date();
+    minDate.setHours(minDate.getHours() + 2);
+    
+    if (date < minDate) {
+      Alert.alert(t('common.attention'), 'Veuillez choisir une heure au minimum dans 2 heures.');
+    } else {
+      setScheduledDate(date);
+      setReservationMode('scheduled');
+    }
+    setDatePickerVisibility(false);
+  };
 
   const [activeRide, setActiveRide]             = useState<ActiveRide | null>(null);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
@@ -434,6 +451,10 @@ export default function ClientHomeScreen() {
       Alert.alert(t('common.attention'), t('client.dropoff'));
       return;
     }
+    if (reservationMode === 'scheduled' && !scheduledDate) {
+      Alert.alert(t('common.attention'), 'Veuillez sélectionner une date et heure.');
+      return;
+    }
     if (!user) return;
     setIsSubmitting(true);
 
@@ -442,7 +463,7 @@ export default function ClientHomeScreen() {
     const finalDistance      = haversineKm(finalPickupCoords, finalDropoffCoords);
     const finalPrice = PRICING[vehicle].base + finalDistance * PRICING[vehicle].perKm + helpers * HELPER_PRICE;
 
-    const { error } = await supabase.from('rides').insert({
+    const rideData = {
       client_id:        user.id,
       pickup_address:   pickupAddress.trim() || t('client.current_location'),
       pickup_lat:       finalPickupCoords.lat,
@@ -450,20 +471,28 @@ export default function ClientHomeScreen() {
       dropoff_address:  dropoffAddress,
       dropoff_lat:      finalDropoffCoords.lat,
       dropoff_lng:      finalDropoffCoords.lng,
-      status:           'pending',
+      status:           'pending', // Si c'est immédiat. Si c'est programmé, ce sera géré par l'écran d'acompte.
       price_calculated: Math.round(finalPrice * 100) / 100,
       helpers_count:    helpers,
       distance_km:      Math.round(finalDistance * 10) / 10,
       requested_vehicle: vehicle,
-    });
+      scheduled_at:     reservationMode === 'scheduled' ? scheduledDate?.toISOString() : null,
+    };
 
-    setIsSubmitting(false);
-    if (error) {
-      Alert.alert(t('common.error'), error.message);
+    if (reservationMode === 'scheduled') {
+      setIsSubmitting(false);
+      navigation.navigate('ThawaniDeposit', { rideData });
     } else {
-      setDropoffAddress('');
-      setDropoffCoords(null);
-      fetchActiveRide();
+      const { error } = await supabase.from('rides').insert(rideData);
+
+      setIsSubmitting(false);
+      if (error) {
+        Alert.alert(t('common.error'), error.message);
+      } else {
+        setDropoffAddress('');
+        setDropoffCoords(null);
+        fetchActiveRide();
+      }
     }
   };
 
@@ -805,6 +834,33 @@ export default function ClientHomeScreen() {
           </View>
         </View>
 
+        {/* ── Sélecteur Hybride ── */}
+        <View className="mb-6">
+          <View className="flex-row bg-slate-100 rounded-xl p-1 mb-3">
+            <TouchableOpacity 
+              className={`flex-1 py-3 rounded-lg items-center ${reservationMode === 'immediate' ? 'bg-white shadow-sm' : ''}`}
+              onPress={() => setReservationMode('immediate')}
+            >
+              <Text className={`font-bold ${reservationMode === 'immediate' ? 'text-slate-800' : 'text-slate-400'}`}>⚡ Tout de suite</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              className={`flex-1 py-3 rounded-lg items-center ${reservationMode === 'scheduled' ? 'bg-white shadow-sm' : ''}`}
+              onPress={() => setDatePickerVisibility(true)}
+            >
+              <Text className={`font-bold ${reservationMode === 'scheduled' ? 'text-slate-800' : 'text-slate-400'}`}>📅 Planifier</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <Text className="text-center text-slate-500 text-sm font-medium">
+            {reservationMode === 'immediate' 
+              ? "Type : Course immédiate" 
+              : scheduledDate 
+                ? `Type : Programmé pour le ${scheduledDate.toLocaleDateString()} à ${scheduledDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+                : "Type : Planification requise"
+            }
+          </Text>
+        </View>
+
         <TouchableOpacity
           onPress={handleConfirmRide}
           disabled={isSubmitting}
@@ -823,6 +879,14 @@ export default function ClientHomeScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <DateTimePickerModal
+        isVisible={isDatePickerVisible}
+        mode="datetime"
+        onConfirm={handleConfirmDate}
+        onCancel={() => setDatePickerVisibility(false)}
+        minimumDate={new Date()}
+      />
     </View>
   );
 
