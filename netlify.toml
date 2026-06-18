@@ -1,0 +1,13 @@
+[build]
+  command = "npx expo export --platform web"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Redirect all routes to index.html for SPA (Single Page Application)
+# This prevents 404 errors when refreshing a page on a non-root URL
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
