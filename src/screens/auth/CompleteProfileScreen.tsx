@@ -35,28 +35,22 @@ export default function CompleteProfileScreen() {
     try {
       const { error } = await supabase
         .from('users')
-        .upsert(
-          {
-            id: user.id,
-            role,
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            // phone_number is already stored in auth.users via OTP verification
-          },
-          { onConflict: 'id' }
-        );
+        .upsert({
+          id: user.id,
+          role,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+        });
 
       if (error) {
-        Alert.alert(t('common.error'), error.message);
-        return;
+        throw error;
       }
 
       // Pull the fresh profile from DB so AppNavigator re-routes correctly
       await refreshProfile();
     } catch (err: any) {
+      setLoading(false); // Explicitly reset loading state before alert
       Alert.alert(t('common.error'), err?.message ?? 'Unknown error');
-    } finally {
-      setLoading(false);
     }
   };
 
