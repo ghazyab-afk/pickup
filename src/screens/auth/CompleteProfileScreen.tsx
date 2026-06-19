@@ -31,6 +31,13 @@ export default function CompleteProfileScreen() {
   const handleSubmit = async () => {
     if (!isFormValid || !user) return;
 
+    // DEV_MODE Bypass: Prevent 401 Unauthorized by skipping real network call
+    // since the session token is a fake 'dev-token' that Supabase will reject.
+    if (user.id === '00000000-0000-0000-0000-000000000001' && devCompleteProfile) {
+      devCompleteProfile(firstName.trim(), lastName.trim(), role);
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
