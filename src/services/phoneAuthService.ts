@@ -110,6 +110,20 @@ export async function verifyOTP(
     if (error) throw error;
     if (!data?.success) throw new Error(data?.message || 'Invalid or expired OTP');
 
+    // ── Persist session in localStorage (web) / SecureStore (native) ──────────
+    // The Edge Function signed the user in server-side and returned a session.
+    // We must call setSession() so the Supabase client stores the tokens locally,
+    // which ensures the session survives a page refresh on web (F5 / Netlify).
+    if (data.session?.access_token && data.session?.refresh_token) {
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+      if (setSessionError) {
+        console.warn('[verifyOTP] setSession warning:', setSessionError.message);
+      }
+    }
+
     // The Edge Function returns a Supabase session after signing in the user
     return { success: true, session: data.session };
   } catch (err: any) {

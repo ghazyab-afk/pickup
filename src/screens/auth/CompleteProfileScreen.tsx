@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { 
-  View, Text, TouchableOpacity, SafeAreaView, TextInput, 
-  KeyboardAvoidingView, Platform, ScrollView 
+import {
+  View, Text, TouchableOpacity, SafeAreaView, TextInput,
+  KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { useAuth, UserRole } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation, useLanguage } from '../../context/LanguageContext';
 import LanguageSelector from '../../components/LanguageSelector';
+import { supabase } from '../../services/supabase';
 
 export default function CompleteProfileScreen() {
-  const { devCompleteProfile, signOut } = useAuth();
+  const { user, refreshProfile, signOut } = useAuth();
   const { t } = useTranslation();
   const { locale } = useLanguage();
   const isRTL = locale.startsWith('ar');
@@ -18,12 +19,44 @@ export default function CompleteProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const isFormValid = role !== null && firstName.trim() !== '' && lastName.trim() !== '' && agreedToTerms;
+  const isFormValid =
+    role !== null &&
+    firstName.trim() !== '' &&
+    lastName.trim() !== '' &&
+    agreedToTerms;
 
-  const handleSubmit = () => {
-    if (isFormValid && devCompleteProfile) {
-      devCompleteProfile(firstName.trim(), lastName.trim(), role);
+  // ── Write the full profile row to Supabase then refresh auth context ─────
+  const handleSubmit = async () => {
+    if (!isFormValid || !user) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .upsert(
+          {
+            id: user.id,
+            role,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            // phone_number is already stored in auth.users via OTP verification
+          },
+          { onConflict: 'id' }
+        );
+
+      if (error) {
+        Alert.alert(t('common.error'), error.message);
+        return;
+      }
+
+      // Pull the fresh profile from DB so AppNavigator re-routes correctly
+      await refreshProfile();
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.message ?? 'Unknown error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -32,11 +65,11 @@ export default function CompleteProfileScreen() {
       <View className="absolute top-10 md:top-14 right-6 z-50">
         <LanguageSelector />
       </View>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
           className="px-6 md:px-0"
           keyboardShouldPersistTaps="handled"
@@ -59,19 +92,21 @@ export default function CompleteProfileScreen() {
                 onPress={() => setRole('client')}
                 activeOpacity={0.8}
                 className={`flex-1 p-6 rounded-2xl border-2 items-center justify-center ${
-                  role === 'client' 
-                    ? 'border-blue-500 bg-blue-50' 
+                  role === 'client'
+                    ? 'border-blue-500 bg-blue-50'
                     : 'border-slate-200 bg-white'
                 }`}
               >
-                <Ionicons 
-                  name="cube-outline" 
-                  size={48} 
-                  color={role === 'client' ? '#3b82f6' : '#94a3b8'} 
+                <Ionicons
+                  name="cube-outline"
+                  size={48}
+                  color={role === 'client' ? '#3b82f6' : '#94a3b8'}
                 />
-                <Text className={`mt-3 font-bold text-lg md:text-xl text-center ${
-                  role === 'client' ? 'text-blue-700' : 'text-slate-600'
-                }`}>
+                <Text
+                  className={`mt-3 font-bold text-lg md:text-xl text-center ${
+                    role === 'client' ? 'text-blue-700' : 'text-slate-600'
+                  }`}
+                >
                   {t('complete_profile.role_client')}
                 </Text>
               </TouchableOpacity>
@@ -81,36 +116,39 @@ export default function CompleteProfileScreen() {
                 onPress={() => setRole('driver')}
                 activeOpacity={0.8}
                 className={`flex-1 p-6 rounded-2xl border-2 items-center justify-center ${
-                  role === 'driver' 
-                    ? 'border-orange-500 bg-orange-50' 
+                  role === 'driver'
+                    ? 'border-orange-500 bg-orange-50'
                     : 'border-slate-200 bg-white'
                 }`}
               >
-                <Ionicons 
-                  name="car-sport-outline" 
-                  size={48} 
-                  color={role === 'driver' ? '#f97316' : '#94a3b8'} 
+                <Ionicons
+                  name="car-sport-outline"
+                  size={48}
+                  color={role === 'driver' ? '#f97316' : '#94a3b8'}
                 />
-                <Text className={`mt-3 font-bold text-lg md:text-xl text-center ${
-                  role === 'driver' ? 'text-orange-700' : 'text-slate-600'
-                }`}>
+                <Text
+                  className={`mt-3 font-bold text-lg md:text-xl text-center ${
+                    role === 'driver' ? 'text-orange-700' : 'text-slate-600'
+                  }`}
+                >
                   {t('complete_profile.role_driver')}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Inputs */}
+            {/* Name Inputs */}
             <View className="gap-4 mb-6">
               <View>
                 <Text className="text-sm md:text-base font-bold text-slate-600 mb-2 ms-1">
                   {t('complete_profile.first_name')}
                 </Text>
                 <TextInput
-                  className="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 h-14 md:h-16 text-base md:text-lg text-slate-800 focus-within:border-blue-500"
+                  className="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 h-14 md:h-16 text-base md:text-lg text-slate-800"
                   placeholder={t('complete_profile.first_name_placeholder')}
                   placeholderTextColor="#94a3b8"
                   value={firstName}
                   onChangeText={setFirstName}
+                  autoCapitalize="words"
                 />
               </View>
 
@@ -119,24 +157,27 @@ export default function CompleteProfileScreen() {
                   {t('complete_profile.last_name')}
                 </Text>
                 <TextInput
-                  className="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 h-14 md:h-16 text-base md:text-lg text-slate-800 focus-within:border-blue-500"
+                  className="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 h-14 md:h-16 text-base md:text-lg text-slate-800"
                   placeholder={t('complete_profile.last_name_placeholder')}
                   placeholderTextColor="#94a3b8"
                   value={lastName}
                   onChangeText={setLastName}
+                  autoCapitalize="words"
                 />
               </View>
             </View>
 
             {/* PDPL Privacy Consent */}
-            <TouchableOpacity 
-              onPress={() => setAgreedToTerms(!agreedToTerms)} 
+            <TouchableOpacity
+              onPress={() => setAgreedToTerms(!agreedToTerms)}
               activeOpacity={0.7}
               className="flex-row items-start mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100"
             >
-              <View className={`w-6 h-6 rounded border-2 items-center justify-center mt-1 me-3 ${
-                agreedToTerms ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'
-              }`}>
+              <View
+                className={`w-6 h-6 rounded border-2 items-center justify-center mt-1 me-3 ${
+                  agreedToTerms ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'
+                }`}
+              >
                 {agreedToTerms && <Ionicons name="checkmark" size={16} color="white" />}
               </View>
               <View className="flex-1">
@@ -152,21 +193,25 @@ export default function CompleteProfileScreen() {
             {/* Submit Button */}
             <TouchableOpacity
               onPress={handleSubmit}
-              disabled={!isFormValid}
+              disabled={!isFormValid || loading}
               activeOpacity={0.8}
               className={`w-full rounded-2xl py-4 md:py-5 items-center shadow-sm ${
-                isFormValid ? 'bg-blue-600' : 'bg-slate-300'
+                isFormValid && !loading ? 'bg-blue-600' : 'bg-slate-300'
               }`}
             >
-              <Text className="text-white text-lg md:text-xl font-extrabold">
-                {t('complete_profile.continue')}
-              </Text>
+              {loading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text className="text-white text-lg md:text-xl font-extrabold">
+                  {t('complete_profile.continue')}
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Sign Out Option */}
             <TouchableOpacity onPress={signOut} className="mt-6 items-center p-4">
               <Text className="text-slate-400 font-semibold text-sm md:text-base">
-                {t('common.close')} / Sign Out
+                {t('profile.logout')}
               </Text>
             </TouchableOpacity>
           </View>

@@ -39,7 +39,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
     const cleanedPhone = phone.replace(/[^\d]/g, '');
 
     if (cleanedPhone.length < 6) {
-      Alert.alert('Attention', 'Veuillez saisir un numéro de téléphone valide');
+      Alert.alert(t('common.attention'), t('phone_auth.invalid_phone'));
       return;
     }
 
@@ -54,7 +54,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
       setPhone(cleanedPhone); // Garder le numéro propre dans l'input
       setStep('otp');
     } else {
-      Alert.alert('Erreur', result.error || 'Échec de l\'envoi du code WhatsApp');
+      Alert.alert(t('common.error'), result.error || t('phone_auth.send_otp'));
     }
   };
 
@@ -101,7 +101,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
   const handleVerifyOtp = async () => {
     const code = otp.join('');
     if (code.length < OTP_LENGTH) {
-      Alert.alert('Attention', 'Veuillez saisir le code complet');
+      Alert.alert(t('common.attention'), t('phone_auth.incomplete_otp'));
       return;
     }
     setLoading(true);
@@ -115,7 +115,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
       }
       // Succès silencieux, Supabase onAuthStateChange va prendre le relais pour naviguer
     } else {
-      Alert.alert('Erreur', result.error || 'Code invalide ou expiré');
+      Alert.alert(t('common.error'), result.error || t('phone_auth.incomplete_otp'));
     }
   };
 
@@ -144,7 +144,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                 t('phone_auth.home_desc')
               ) : (
                 <Text>
-                  Un code de validation OTP vous a été envoyé sur votre compte WhatsApp au{' '}
+                  {t('phone_auth.otp_sent_desc')}{' '}
                   <Text style={{ direction: 'ltr', fontWeight: 'bold', color: '#64748b' }}>
                     {selectedCountry.code} {phone}
                   </Text>
@@ -244,7 +244,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                   <View className="flex-row items-center">
                     <Ionicons name="checkmark-circle-outline" size={22} color="white" />
                     <Text className="text-white text-lg md:text-xl font-extrabold ms-2">
-                      Vérifier le code
+                      {t('phone_auth.verify')}
                     </Text>
                   </View>
                 )}
@@ -255,7 +255,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                 className="mt-6 items-center py-3"
               >
                 <Text className="text-blue-500 text-base md:text-lg font-semibold">
-                  Renvoyer un code WhatsApp
+                  {t('phone_auth.resend_otp')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -282,7 +282,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
         <View className="flex-1 justify-end bg-black/60">
           <View className="bg-white rounded-t-3xl max-h-[70%]">
             <View className="flex-row justify-between items-center p-6 border-b border-slate-100">
-              <Text className="text-xl font-black text-slate-800">Choisir un pays</Text>
+              <Text className="text-xl font-black text-slate-800">{t('phone_auth.choose_country')}</Text>
               <TouchableOpacity onPress={() => setShowCountryModal(false)} className="bg-slate-100 p-2 rounded-full">
                 <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>

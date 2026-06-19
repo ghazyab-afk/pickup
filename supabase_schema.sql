@@ -68,6 +68,9 @@ ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
 -- Exemples de Policies (à adapter selon les besoins exacts de sécurité)
 CREATE POLICY "Les utilisateurs peuvent voir leur propre profil" ON public.users FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Les utilisateurs peuvent créer leur propre profil" ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Les utilisateurs peuvent mettre à jour leur propre profil" ON public.users FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 CREATE POLICY "Les clients peuvent voir leurs propres trajets" ON public.rides FOR SELECT USING (auth.uid() = client_id);
 CREATE POLICY "Les chauffeurs peuvent voir les trajets en attente" ON public.rides FOR SELECT USING (status = 'pending');
 CREATE POLICY "Les chauffeurs peuvent voir leurs trajets assignés" ON public.rides FOR SELECT USING (auth.uid() = driver_id);
+

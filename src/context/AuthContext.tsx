@@ -68,16 +68,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .select('*')
         .eq('id', userId)
         .single();
-      
-      if (!error && data) {
+
+      if (error && error.code === 'PGRST116') {
+        // No row yet — new user just verified their phone.
+        // Leave profile=null so AppNavigator routes to CompleteProfileScreen,
+        // which will write the full row (role + name) to Supabase.
+        setProfile(null);
+      } else if (!error && data) {
         setProfile(data);
       }
-    } catch (error) {
-      console.log('Erreur récupération profil:', error);
+    } catch (err) {
+      console.log('Erreur récupération profil:', err);
     } finally {
       setLoading(false);
     }
   };
+
 
   const signOut = async () => {
     await supabase.auth.signOut();
