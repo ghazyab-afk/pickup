@@ -96,7 +96,7 @@ export async function verifyOTP(
       // Return a fake session so the app behaves as if logged in
       return {
         success: true,
-        session: { user: { phone, id: 'dev-user-001' }, access_token: 'dev-token' },
+        session: { user: { phone, id: '00000000-0000-0000-0000-000000000001' }, access_token: 'dev-token' },
       };
     }
     return { success: false, error: 'Invalid OTP. In dev mode, use: ' + DEV_MOCK_OTP };
