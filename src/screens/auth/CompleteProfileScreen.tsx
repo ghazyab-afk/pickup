@@ -10,7 +10,7 @@ import LanguageSelector from '../../components/LanguageSelector';
 import { supabase } from '../../services/supabase';
 
 export default function CompleteProfileScreen() {
-  const { user, refreshProfile, signOut } = useAuth();
+  const { user, refreshProfile, signOut, devCompleteProfile } = useAuth();
   const { t } = useTranslation();
   const { locale } = useLanguage();
   const isRTL = locale.startsWith('ar');
@@ -29,22 +29,36 @@ export default function CompleteProfileScreen() {
 
   // ── Write the full profile row to Supabase then refresh auth context ─────
   const handleSubmit = async () => {
-    if (!isFormValid || !user) return;
+    if (!isFormValid) return;
 
     // DEV_MODE Bypass: Prevent 401 Unauthorized by skipping real network call
-    // since the session token is a fake 'dev-token' that Supabase will reject.
-    if (user.id === '00000000-0000-0000-0000-000000000001' && devCompleteProfile) {
-      devCompleteProfile(firstName.trim(), lastName.trim(), role);
+    if (user?.id === '00000000-0000-0000-0000-000000000001' && devCompleteProfile) {
+      devCompleteProfile(firstName.trim(), lastName.trim(), role!);
       return;
     }
 
     setLoading(true);
     try {
+      // 1. Get the live verified user from the auth session securely
+      const { data: { user: liveUser }, error: authError } = await supabase.auth.getUser();
+      const liveUserId = liveUser?.id;
+
+      if (authError || !liveUserId) {
+        Alert.alert(t('common.error'), 'Session expiré, veuillez vous reconnecter.');
+        setLoading(false);
+        signOut();
+        return;
+      }
+
+      // 2. Format role safely for Postgres ENUM
+      const formattedRole = role!.toLowerCase() as UserRole;
+
+      // 3. Upsert into public.users using live ID
       const { error } = await supabase
         .from('users')
         .upsert({
-          id: user.id,
-          role,
+          id: liveUserId,
+          role: formattedRole,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
         });
@@ -53,7 +67,7 @@ export default function CompleteProfileScreen() {
         throw error;
       }
 
-      // Pull the fresh profile from DB so AppNavigator re-routes correctly
+      // 4. Pull the fresh profile from DB so AppNavigator re-routes correctly
       await refreshProfile();
     } catch (err: any) {
       setLoading(false); // Explicitly reset loading state before alert
