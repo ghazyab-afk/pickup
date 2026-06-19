@@ -104,7 +104,7 @@ export default function DriverDashboardScreen({ navigation }: any) {
         <View className="flex-1">
           {item.status === 'pending_urgent' && (
             <View className="bg-red-500 self-start px-3 py-1 rounded-full mb-2 flex-row items-center">
-              <Text className="text-white font-extrabold text-xs uppercase tracking-wide">🚨 URGENT — Annulation tardive</Text>
+              <Text className="text-white font-extrabold text-xs uppercase tracking-wide">{t('driver.urgent')}</Text>
             </View>
           )}
           <View className="bg-blue-50 self-start px-3 md:px-4 py-1 md:py-2 rounded-full border border-blue-100 mb-2">
@@ -166,13 +166,13 @@ export default function DriverDashboardScreen({ navigation }: any) {
           className={`flex-1 py-3 rounded-lg items-center ${activeTab === 'immediate' ? 'bg-white shadow-sm' : ''}`}
           onPress={() => setActiveTab('immediate')}
         >
-          <Text className={`font-bold ${activeTab === 'immediate' ? 'text-slate-800' : 'text-slate-400'}`}>⚡ Autour de moi</Text>
+          <Text className={`font-bold ${activeTab === 'immediate' ? 'text-slate-800' : 'text-slate-400'}`}>{t('driver.tab_around_me')}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           className={`flex-1 py-3 rounded-lg items-center ${activeTab === 'scheduled' ? 'bg-white shadow-sm' : ''}`}
           onPress={() => setActiveTab('scheduled')}
         >
-          <Text className={`font-bold ${activeTab === 'scheduled' ? 'text-slate-800' : 'text-slate-400'}`}>📅 Mon Planning</Text>
+          <Text className={`font-bold ${activeTab === 'scheduled' ? 'text-slate-800' : 'text-slate-400'}`}>{t('driver.tab_my_schedule')}</Text>
         </TouchableOpacity>
       </View>
 

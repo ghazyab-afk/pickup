@@ -16,7 +16,7 @@ export default function DriverProfileScreen() {
   const { signOut, profile } = useAuth();
   const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url || null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>((profile as any)?.avatar_url || null);
 
   const handlePickImage = async () => {
     try {

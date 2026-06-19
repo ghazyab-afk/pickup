@@ -841,22 +841,22 @@ export default function ClientHomeScreen({ navigation }: any) {
               className={`flex-1 py-3 rounded-lg items-center ${reservationMode === 'immediate' ? 'bg-white shadow-sm' : ''}`}
               onPress={() => setReservationMode('immediate')}
             >
-              <Text className={`font-bold ${reservationMode === 'immediate' ? 'text-slate-800' : 'text-slate-400'}`}>⚡ Tout de suite</Text>
+              <Text className={`font-bold ${reservationMode === 'immediate' ? 'text-slate-800' : 'text-slate-400'}`}>⚡ {t('client.immediate_ride')}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               className={`flex-1 py-3 rounded-lg items-center ${reservationMode === 'scheduled' ? 'bg-white shadow-sm' : ''}`}
               onPress={() => setDatePickerVisibility(true)}
             >
-              <Text className={`font-bold ${reservationMode === 'scheduled' ? 'text-slate-800' : 'text-slate-400'}`}>📅 Planifier</Text>
+              <Text className={`font-bold ${reservationMode === 'scheduled' ? 'text-slate-800' : 'text-slate-400'}`}>📅 {t('client.schedule_ride')}</Text>
             </TouchableOpacity>
           </View>
           
           <Text className="text-center text-slate-500 text-sm font-medium">
             {reservationMode === 'immediate' 
-              ? "Type : Course immédiate" 
+              ? t('client.type_immediate') 
               : scheduledDate 
-                ? `Type : Programmé pour le ${scheduledDate.toLocaleDateString()} à ${scheduledDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
-                : "Type : Planification requise"
+                ? `${t('client.type_scheduled')} ${scheduledDate.toLocaleDateString()} à ${scheduledDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+                : t('client.type_planning_req')
             }
           </Text>
         </View>
@@ -880,13 +880,35 @@ export default function ClientHomeScreen({ navigation }: any) {
         </TouchableOpacity>
       </ScrollView>
 
-      <DateTimePickerModal
-        isVisible={isDatePickerVisible}
-        mode="datetime"
-        onConfirm={handleConfirmDate}
-        onCancel={() => setDatePickerVisibility(false)}
-        minimumDate={new Date()}
-      />
+      {Platform.OS === 'web' && isDatePickerVisible ? (
+        <Modal visible={true} transparent={true} animationType="fade">
+          <View className="flex-1 justify-center items-center bg-black/50 px-6">
+            <View className="bg-white p-6 rounded-2xl w-full max-w-sm">
+              <Text className="text-lg font-bold mb-4">{t('client.schedule_ride')}</Text>
+              <input 
+                type="datetime-local" 
+                style={{ width: '100%', padding: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '16px', fontSize: '16px' }}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleConfirmDate(new Date(e.target.value));
+                  }
+                }}
+              />
+              <TouchableOpacity onPress={() => setDatePickerVisibility(false)} className="bg-slate-200 p-3 rounded-xl items-center">
+                <Text className="font-bold text-slate-700">{t('common.cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        <DateTimePickerModal
+          isVisible={isDatePickerVisible}
+          mode="datetime"
+          onConfirm={handleConfirmDate}
+          onCancel={() => setDatePickerVisibility(false)}
+          minimumDate={new Date()}
+        />
+      )}
     </View>
   );
 
