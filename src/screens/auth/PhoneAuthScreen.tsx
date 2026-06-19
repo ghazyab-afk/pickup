@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../context/LanguageContext';
 import { sendWhatsAppOTP, verifyOTP } from '../../services/phoneAuthService';
 
 const OTP_LENGTH = 6;
@@ -23,6 +24,7 @@ const COUNTRIES = [
 
 export default function PhoneAuthScreen({ navigation }: any) {
   const { devLogin } = useAuth();
+  const { t } = useTranslation();
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [phone, setPhone] = useState('');
@@ -135,11 +137,11 @@ export default function PhoneAuthScreen({ navigation }: any) {
               <Ionicons name="car-sport" size={40} color="#1e293b" />
             </View>
             <Text className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-800 text-center">
-              {step === 'phone' ? 'Bienvenue sur Pickup' : 'Validation WhatsApp'}
+              {step === 'phone' ? t('phone_auth.home_title') : t('phone_auth.title')}
             </Text>
             <Text className="text-base md:text-lg lg:text-xl text-slate-400 font-medium mt-2 text-center">
               {step === 'phone' ? (
-                'Commandez un transport en quelques clics'
+                t('phone_auth.home_desc')
               ) : (
                 <Text>
                   Un code de validation OTP vous a été envoyé sur votre compte WhatsApp au{' '}
@@ -155,7 +157,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
             /* ── Phone Input ─────────────────────────────────────────── */
             <View>
               <Text className="text-sm md:text-base font-bold text-slate-600 mb-2 ms-1">
-                Numéro de téléphone
+                {t('phone_auth.phone_number')}
               </Text>
               <View 
                 className="flex-row items-center bg-white border-2 border-slate-200 rounded-2xl overflow-hidden focus-within:border-blue-500 h-16 md:h-18"
@@ -187,7 +189,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                 />
               </View>
               <Text className="text-xs text-slate-400 mt-2 ms-1 text-center">
-                Saisissez votre numéro sans l'indicatif
+                {t('phone_auth.phone_hint')}
               </Text>
 
               <TouchableOpacity
@@ -200,7 +202,7 @@ export default function PhoneAuthScreen({ navigation }: any) {
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text className="text-white text-lg md:text-xl font-extrabold">
-                    Recevoir le code
+                    {t('phone_auth.send_otp')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -262,13 +264,16 @@ export default function PhoneAuthScreen({ navigation }: any) {
         </View>
 
         {/* ── Lien Espace Chauffeur ─────────────────────────────────── */}
-        <View className="pb-8 pt-4 items-center">
-          <TouchableOpacity onPress={() => navigation?.navigate('Login')}>
-            <Text className="text-xs text-slate-400 font-medium tracking-wide">
-              Espace Chauffeur / Partenaire
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          className="mt-6 p-4 rounded-xl items-center"
+          onPress={() => {
+            navigation?.navigate('Login');
+          }}
+        >
+          <Text className="text-slate-400 font-bold tracking-widest uppercase text-xs">
+            {t('phone_auth.driver_space')}
+          </Text>
+        </TouchableOpacity>
 
       </ScrollView>
 

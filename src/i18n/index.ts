@@ -48,7 +48,6 @@ export const reloadApp = async () => {
     if (typeof document !== 'undefined') {
       const isRTL = i18n.locale === 'ar';
       document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
-      window.location.reload();
     }
     return;
   }

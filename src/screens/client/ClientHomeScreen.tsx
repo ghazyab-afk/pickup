@@ -715,20 +715,20 @@ export default function ClientHomeScreen({ navigation }: any) {
       {/* Indicateur de mode clic (Web seulement) */}
       {Platform.OS === 'web' && (
         <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
-          <Text style={{ fontSize: 11, color: '#94a3b8', marginRight: 6 }}>🖱 Clic sur la carte :</Text>
+          <Text style={{ fontSize: 11, color: '#94a3b8', marginRight: 6 }}>🖱 {t('client.map_click')}</Text>
           <TouchableOpacity
             onPress={() => setActiveMapField('pickup')}
             style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, marginRight: 4,
               backgroundColor: activeMapField === 'pickup' ? '#3b82f6' : '#f1f5f9' }}
           >
-            <Text style={{ fontSize: 11, fontWeight: '700', color: activeMapField === 'pickup' ? 'white' : '#64748b' }}>● Départ</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: activeMapField === 'pickup' ? 'white' : '#64748b' }}>● {t('client.pickup')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setActiveMapField('dropoff')}
             style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20,
               backgroundColor: activeMapField === 'dropoff' ? '#ef4444' : '#f1f5f9' }}
           >
-            <Text style={{ fontSize: 11, fontWeight: '700', color: activeMapField === 'dropoff' ? 'white' : '#64748b' }}>■ Arrivée</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: activeMapField === 'dropoff' ? 'white' : '#64748b' }}>■ {t('client.dropoff')}</Text>
           </TouchableOpacity>
         </View>
       )}
