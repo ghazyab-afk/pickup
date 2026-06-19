@@ -6,7 +6,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { sendWhatsAppOTP, verifyOTP } from '../../services/phoneAuthService';
-import LanguageSelector from '../../components/LanguageSelector';
 
 const OTP_LENGTH = 6;
 
@@ -123,9 +122,6 @@ export default function PhoneAuthScreen({ navigation }: any) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-slate-50 relative"
     >
-      <View className="absolute top-10 md:top-14 right-6 z-50">
-        <LanguageSelector />
-      </View>
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         className="px-6 md:px-0"
